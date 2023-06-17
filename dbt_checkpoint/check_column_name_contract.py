@@ -18,22 +18,22 @@ from dbt_checkpoint.utils import (
 
 
 def check_column_name_contract(
-    paths: Sequence[str], pattern: str, dtype: str, catalog: Dict[str, Any]
+    paths: Sequence[str], pattern: str, dtype: str, catalog: Dict[str, Any], pattern_flg: bool = False
 ) -> Dict[str, Any]:
     status_code = 0
     sqls = get_filenames(paths, [".sql"])
     filenames = set(sqls.keys())
     models = get_models(catalog, filenames)
-    dtype = re.split(r', | (?!.*?, )|,', dtype)
+    dtype = re.split(r', | (?!.*?, )|,|\|', dtype)
 
     for model in models:
         for col in model.node.get("columns", []).values():
-            col_name = col.get("name")
-            col_type = col.get("type")
+            col_name = col.get("name").lower()
+            col_type = col.get("type").lower()
 
             # Check all files of type dtype follow naming pattern
-            if col_type.lower() in [t.lower() for t in dtype]:
-                if re.match(pattern, col_name) is None:
+            if col_type in [t.lower() for t in dtype] and not pattern_flg:
+                if re.match(pattern, col_name, re.IGNORECASE) is None:
                     status_code = 1
                     print(
                         f"{red(col_name)}: column is of type {yellow(dtype)} and "
@@ -41,7 +41,7 @@ def check_column_name_contract(
                     )
 
             # Check all files with naming pattern are of type dtype
-            elif re.match(pattern, col_name):
+            elif re.match(pattern, col_name, re.IGNORECASE):
                 status_code = 1
                 print(
                     f"{red(col_name)}: name matches regex pattern {yellow(pattern)} "
@@ -68,6 +68,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         required=True,
         help="Expected data type(s) for the matching columns.",
     )
+    parser.add_argument(
+        "--pattern_flg",
+        type=bool,
+        required=False,
+        help="Set to true if you only want to check a column name adheres to a data type.",
+    )
 
     args = parser.parse_args(argv)
 
@@ -89,6 +95,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         pattern=args.pattern,
         dtype=args.dtype,
         catalog=catalog,
+        pattern_flg=args.pattern_flg,
     )
 
     end_time = time.time()
