@@ -32,8 +32,8 @@ def check_column_name_contract(
             col_type = col.get("type").lower()
 
             # Check all files of type dtype follow naming pattern
-            if col_type in [t.lower() for t in dtype] and not pattern_flg:
-                if re.match(pattern, col_name, re.IGNORECASE) is None:
+            if col_type in [t.lower() for t in dtype]:
+                if re.match(pattern, col_name, re.IGNORECASE) is None and not pattern_flg:
                     status_code = 1
                     print(
                         f"{red(col_name)}: column is of type {yellow(dtype)} and "
