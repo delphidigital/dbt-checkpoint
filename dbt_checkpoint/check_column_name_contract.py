@@ -24,6 +24,7 @@ def check_column_name_contract(
     sqls = get_filenames(paths, [".sql"])
     filenames = set(sqls.keys())
     models = get_models(catalog, filenames)
+    dtype = re.split(r', | (?!.*?, )|,', dtype)
 
     for model in models:
         for col in model.node.get("columns", []).values():
@@ -31,7 +32,7 @@ def check_column_name_contract(
             col_type = col.get("type")
 
             # Check all files of type dtype follow naming pattern
-            if dtype == col_type:
+            if col_type.lower() in [t.lower() for t in dtype]:
                 if re.match(pattern, col_name) is None:
                     status_code = 1
                     print(
@@ -65,7 +66,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--dtype",
         type=str,
         required=True,
-        help="Expected data type for the matching columns.",
+        help="Expected data type(s) for the matching columns.",
     )
 
     args = parser.parse_args(argv)
