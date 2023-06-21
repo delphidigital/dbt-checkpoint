@@ -18,13 +18,22 @@ from dbt_checkpoint.utils import (
 
 
 def check_column_name_contract(
-    paths: Sequence[str], pattern: str, dtype: str, catalog: Dict[str, Any], pattern_flg: bool = False
+    paths: Sequence[str],
+    pattern: str,
+    dtype: str,
+    catalog: Dict[str, Any],
+    pattern_flg: bool = False,
+    col_name_ignore: str = '',
 ) -> Dict[str, Any]:
     status_code = 0
     sqls = get_filenames(paths, [".sql"])
     filenames = set(sqls.keys())
     models = get_models(catalog, filenames)
     dtype = re.split(r', | (?!.*?, )|,|\|', dtype)
+    dtype = [t.lower() for t in dtype]
+    dtype_upper = [t.upper() for t in dtype]
+    col_name_ignore = re.split(r', | (?!.*?, )|,|\|', col_name_ignore)
+    col_name_ignore = [c.lower() for c in col_name_ignore]
 
     for model in models:
         for col in model.node.get("columns", []).values():
@@ -32,20 +41,20 @@ def check_column_name_contract(
             col_type = col.get("type").lower()
 
             # Check all files of type dtype follow naming pattern
-            if col_type in [t.lower() for t in dtype]:
-                if re.match(pattern, col_name, re.IGNORECASE) is None and not pattern_flg:
+            if col_type in dtype:
+                if col_name not in col_name_ignore and re.match(pattern, col_name, re.IGNORECASE) is None and not pattern_flg:
                     status_code = 1
                     print(
-                        f"{red(col_name)}: column is of type {yellow(dtype)} and "
+                        f"{red(col_name)}: column is of type {yellow(dtype_upper)} and "
                         f"does not match regex pattern {yellow(pattern)}."
                     )
 
             # Check all files with naming pattern are of type dtype
-            elif re.match(pattern, col_name, re.IGNORECASE):
+            elif col_name not in col_name_ignore and re.match(pattern, col_name, re.IGNORECASE):
                 status_code = 1
                 print(
                     f"{red(col_name)}: name matches regex pattern {yellow(pattern)} "
-                    f"and is of type {yellow(col_type)} instead of {yellow(dtype)}."
+                    f"and is of type {yellow(col_type)} instead of {yellow(dtype_upper)}."
                 )
 
     return {"status_code": status_code}
@@ -73,6 +82,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         type=bool,
         required=False,
         help="Set to true if you only want to check a column name adheres to a data type.",
+        default=False,
+    )
+    parser.add_argument(
+        "--col_name_ignore",
+        type=str,
+        required=False,
+        help="Pass a column name to ignore the data type check.",
+        default='',
     )
 
     args = parser.parse_args(argv)
@@ -96,6 +113,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         dtype=args.dtype,
         catalog=catalog,
         pattern_flg=args.pattern_flg,
+        col_name_ignore=args.col_name_ignore,
     )
 
     end_time = time.time()
